@@ -1,0 +1,32 @@
+# Render Blueprint — backend API only (Express + Prisma).
+# Frontend is deployed separately on Vercel (see README "Deploy").
+#
+# In Render: New + → Blueprint → pick this repo. Or create a Web Service
+# manually with the same settings.
+services:
+  - type: web
+    name: mhs-orgchart-api
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install && npm run build
+    # Apply migrations (and seed once — seed is idempotent) before going live.
+    preDeployCommand: npx prisma migrate deploy && npm run db:seed
+    startCommand: npm start
+    healthCheckPath: /api/health
+    # Persistent disk so uploaded role-clarity documents survive deploys.
+    disk:
+      name: uploads
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: DATABASE_URL
+        sync: false # set in the Render dashboard (your Postgres URL)
+      - key: CLIENT_ORIGIN
+        sync: false # set to your Vercel URL, e.g. https://your-app.vercel.app
+      - key: SHARED_PASSWORD
+        sync: false # optional: set to enable the password gate

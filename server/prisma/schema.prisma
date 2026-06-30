@@ -1,0 +1,80 @@
+// MyHealthSchool Org Chart — data model
+// Mirrors the old client-side `State` object, now persisted in PostgreSQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Node {
+  id        String   @id
+  badge     String   @default("ROLE")
+  title     String   @default("New Position")
+  sub       String   @default("")
+  color     String   @default("#6c63ff")
+  project   String   @default("shared")
+  status    String   @default("active")
+  x         Float    @default(100)
+  y         Float    @default(100)
+  view      String   @default("master")
+  collapsed Boolean  @default(false)
+  // hc: { req, have, hire, notice } | null
+  hc        Json?
+  // size: { w, h } | null  (null = default 200x110)
+  size      Json?
+  // clarity: { reports_to, dept, responsibilities, kpis[], kras[], doc_notes, doc_link }
+  clarity   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  connectionsFrom Connection[] @relation("from")
+  connectionsTo   Connection[] @relation("to")
+  file            File?
+
+  @@map("nodes")
+}
+
+model Connection {
+  id        String  @id
+  fromNode  String
+  toNode    String
+  view      String  @default("master")
+  lineStyle String? // null = use global default
+
+  from Node @relation("from", fields: [fromNode], references: [id], onDelete: Cascade)
+  to   Node @relation("to", fields: [toNode], references: [id], onDelete: Cascade)
+
+  @@index([fromNode])
+  @@index([toNode])
+  @@map("connections")
+}
+
+// One role-clarity document per node (matches old State.files[nodeId]).
+model File {
+  id         String   @id @default(cuid())
+  nodeId     String   @unique
+  name       String
+  mimeType   String
+  size       Int
+  storageKey String // path/key under the upload store
+  createdAt  DateTime @default(now())
+
+  node Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@map("files")
+}
+
+// Full, permanent change history — never auto-trimmed.
+model History {
+  id      Int      @id @default(autoincrement())
+  ts      DateTime @default(now())
+  action  String
+  details Json?
+
+  @@index([ts])
+  @@map("history")
+}
