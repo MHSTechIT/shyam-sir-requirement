@@ -9,9 +9,11 @@ services:
     runtime: node
     rootDir: server
     plan: free
-    buildCommand: npm install && npm run build
-    # Apply migrations (and seed once — seed is idempotent) before going live.
-    preDeployCommand: npx prisma migrate deploy && npm run db:seed
+    # --include=dev is REQUIRED: NODE_ENV=production makes npm skip devDeps,
+    # but tsc/prisma/tsx live there and are needed to build.
+    buildCommand: npm install --include=dev && npm run build
+    # Apply any pending migrations before the new version goes live.
+    preDeployCommand: npx prisma migrate deploy
     startCommand: npm start
     healthCheckPath: /api/health
     # Persistent disk so uploaded role-clarity documents survive deploys.
