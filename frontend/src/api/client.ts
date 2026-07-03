@@ -51,6 +51,9 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // ── realtime ──
+  eventsUrl: () => `${BASE}/events`,
+
   // ── auth ──
   authStatus: () =>
     req<{ required: boolean; authed: boolean }>("/auth/status"),

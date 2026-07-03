@@ -62,6 +62,28 @@ export function App() {
     };
   }, []);
 
+  // Real-time: when another user's change is broadcast, refresh — unless we have
+  // local unsaved edits (then just notify, so we don't clobber the buffer).
+  useEffect(() => {
+    if (gate !== "ok") return;
+    const es = new EventSource(api.eventsUrl(), { withCredentials: true });
+    let t: ReturnType<typeof setTimeout> | undefined;
+    es.onmessage = () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        const s = useOrg.getState();
+        if (s.saving) return;
+        if (s.dirty) s.toast("Someone else saved changes — reload to sync", "warn");
+        else s.load();
+      }, 300);
+    };
+    es.onerror = () => {}; // browser auto-reconnects
+    return () => {
+      clearTimeout(t);
+      es.close();
+    };
+  }, [gate]);
+
   // Keep the fullscreen flag in sync with the browser (also catches Esc-exit).
   useEffect(() => {
     const onFsChange = () => setFullscreen(Boolean(document.fullscreenElement));

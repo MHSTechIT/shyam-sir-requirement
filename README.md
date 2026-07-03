@@ -26,7 +26,7 @@ frontend (React + React Flow)  ──REST/JSON──►  backend (Express)  ─�
 nsi/
 ├─ frontend/        React + Vite app
 ├─ backend/         Express + pg API (also serves the built frontend in prod)
-├─ docker-compose.yml   local PostgreSQL
+├─ render.yaml      Render deploy blueprint (backend)
 └─ package.json     root scripts to run both apps
 ```
 
@@ -34,13 +34,11 @@ nsi/
 
 ## Quick start (local development)
 
-### 1. Start PostgreSQL
+### 1. PostgreSQL
 
-```bash
-docker compose up -d        # starts Postgres on localhost:5432
-```
-
-(or point `DATABASE_URL` at any existing Postgres instance)
+Point `DATABASE_URL` (in `backend/.env`) at any PostgreSQL instance — a local one
+(e.g. managed with pgAdmin) or a remote server. Tables are created automatically
+on first boot.
 
 ### 2. Backend
 

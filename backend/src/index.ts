@@ -7,6 +7,7 @@ import path from "path";
 import fs from "fs";
 
 import { query, ensureSchema } from "./db";
+import { addClient, broadcast } from "./events";
 import stateRouter from "./routes/state";
 import nodesRouter from "./routes/nodes";
 import connectionsRouter from "./routes/connections";
@@ -85,6 +86,30 @@ app.get("/api/health", async (_req, res) => {
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e) });
   }
+});
+
+// ── Real-time: SSE stream + broadcast on every successful write ──────────────
+app.get("/api/events", (_req, res) => {
+  res.set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.flushHeaders?.();
+  res.write(":connected\n\n");
+  addClient(res);
+});
+
+app.use("/api", (req, res, next) => {
+  if (req.method !== "GET") {
+    res.on("finish", () => {
+      if (res.statusCode < 300) {
+        broadcast({ type: "changed", path: req.path, ts: Date.now() });
+      }
+    });
+  }
+  next();
 });
 
 app.use("/api/state", stateRouter);
