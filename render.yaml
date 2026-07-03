@@ -1,4 +1,4 @@
-# Render Blueprint — backend API only (Express + Prisma).
+# Render Blueprint — backend API only (Express + node-postgres).
 # Frontend is deployed separately on Vercel (see README "Deploy").
 #
 # In Render: New + → Blueprint → pick this repo. Or create a Web Service
@@ -7,13 +7,12 @@ services:
   - type: web
     name: mhs-orgchart-api
     runtime: node
-    rootDir: server
+    rootDir: backend
     plan: free
     # --include=dev is REQUIRED: NODE_ENV=production makes npm skip devDeps,
-    # but tsc/prisma/tsx live there and are needed to build.
+    # but TypeScript (tsc) lives there and is needed to build.
     buildCommand: npm install --include=dev && npm run build
-    # Apply any pending migrations before the new version goes live.
-    preDeployCommand: npx prisma migrate deploy
+    # No migration step needed — the app creates tables on boot (ensureSchema).
     startCommand: npm start
     healthCheckPath: /api/health
     # Persistent disk so uploaded role-clarity documents survive deploys.

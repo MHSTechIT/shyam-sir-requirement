@@ -5,6 +5,6 @@ build/
 .env
 .env.local
 .DS_Store
-server/uploads/
-client/dist/
+backend/uploads/
+frontend/dist/
 coverage/

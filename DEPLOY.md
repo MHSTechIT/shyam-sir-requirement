@@ -2,8 +2,8 @@
 
 Monorepo with two deployables:
 
-- **`client/`** → Vercel (React static site)
-- **`server/`** → Render (Express API + Prisma)
+- **`frontend/`** → Vercel (React static site)
+- **`backend/`** → Render (Express API + node-postgres)
 - **PostgreSQL** → your existing remote DB (already migrated + seeded), or a new Render Postgres.
 
 Deploy the **backend first** (you need its URL for the frontend), then the frontend, then link them.
@@ -18,20 +18,16 @@ Deploy the **backend first** (you need its URL for the frontend), then the front
    | Field | Value |
    |---|---|
    | Name | `mhs-orgchart-api` |
-   | Root Directory | `server` |
+   | Root Directory | `backend` |
    | Runtime | `Node` |
    | Build Command | `npm install --include=dev && npm run build` |
    | Start Command | `npm start` |
    | Health Check Path | `/api/health` |
    > **Why `--include=dev`:** we set `NODE_ENV=production` (below), which makes npm
-   > skip devDependencies — but `typescript`/`prisma` live there and are needed to
-   > build. This flag is the #1 fix for "tsc: not found" / "prisma: not found" build
-   > failures.
-3. **Advanced → Pre-Deploy Command:**
-   ```
-   npx prisma migrate deploy
-   ```
-4. **Environment Variables** (Advanced → Add):
+   > skip devDependencies — but `typescript` (tsc) lives there and is needed to
+   > build. This flag is the #1 fix for "tsc: not found" build failures.
+   > No pre-deploy/migration step is needed — the app creates its tables on boot.
+3. **Environment Variables** (Advanced → Add):
    | Key | Value |
    |---|---|
    | `DATABASE_URL` | `postgresql://postgres:%24erver2026@13.202.225.50:5432/nsi_team?schema=public` |
@@ -39,13 +35,13 @@ Deploy the **backend first** (you need its URL for the frontend), then the front
    | `UPLOAD_DIR` | `/var/data/uploads` |
 
    > The `$` in the password is written as `%24` (URL-encoded) — paste it exactly.
-5. **Add a Disk** (so uploaded documents survive redeploys):
+4. **Add a Disk** (so uploaded documents survive redeploys):
    Name `uploads`, Mount Path `/var/data`, Size `1 GB`.
-6. **Create Web Service.** Wait for "Live", then test:
+5. **Create Web Service.** Wait for "Live", then test:
    `https://<your-service>.onrender.com/api/health` → must return `{"ok":true}`.
-7. Copy the service URL, e.g. `https://mhs-orgchart-api.onrender.com`.
+6. Copy the service URL, e.g. `https://mhs-orgchart-api.onrender.com`.
 
-> **Shortcut:** instead of steps 1–5, use **New + → Blueprint** and pick the repo —
+> **Shortcut:** instead of steps 1–4, use **New + → Blueprint** and pick the repo —
 > Render reads `render.yaml` and pre-fills everything; you only set `DATABASE_URL`.
 
 > **Fresh database?** If you point `DATABASE_URL` at a brand-new empty DB, open the
@@ -57,7 +53,7 @@ Deploy the **backend first** (you need its URL for the frontend), then the front
 ## B. Frontend on Vercel
 
 1. **vercel.com → Add New → Project** → import `MHSTechIT/shyam-sir-requirement`.
-2. **Root Directory:** click **Edit** and select **`client`**. *(Critical — without
+2. **Root Directory:** click **Edit** and select **`frontend`**. *(Critical — without
    this Vercel builds from the repo root and fails.)*
 3. Framework Preset auto-detects **Vite**. Leave Build/Output as default
    (`npm run build` → `dist`).
@@ -90,9 +86,9 @@ Every `git push` to `main` now auto-redeploys both.
 
 | Symptom | Cause / Fix |
 |---|---|
-| Render build: `tsc: not found` / `prisma: not found` | Build command missing `--include=dev`. Use `npm install --include=dev && npm run build`. |
+| Render build: `tsc: not found` | Build command missing `--include=dev`. Use `npm install --include=dev && npm run build`. |
 | Render: `Can't reach database server` during deploy | `DATABASE_URL` wrong or DB unreachable. Verify the value; the `$` must be `%24`. |
-| Vercel build fails immediately | Root Directory not set to `client`. |
+| Vercel build fails immediately | Root Directory not set to `frontend`. |
 | App loads but "Couldn't load the chart / timed out" | `VITE_API_URL` missing or wrong on Vercel, or backend asleep (free tier) — wait ~60s and Retry. |
 | Browser console: CORS error | Set `CLIENT_ORIGIN` on Render to the exact Vercel URL (no trailing slash). |
 | Uploaded documents vanish after redeploy | Add the Render Disk (step A.5) and set `UPLOAD_DIR=/var/data/uploads`. |
@@ -104,7 +100,7 @@ Every `git push` to `main` now auto-redeploys both.
 
 ```bash
 # backend
-cd server && npm install && npm run db:migrate && npm run db:seed && npm run dev
+cd backend && npm install && npm run db:seed && npm run dev
 # frontend (new terminal)
-cd client && npm install && npm run dev   # http://localhost:5180
+cd frontend && npm install && npm run dev   # http://localhost:5180
 ```

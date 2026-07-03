@@ -3,7 +3,7 @@
 Full-stack rebuild of the single-file `mhs_orgchart_v7.html` org-chart tool.
 
 - **Frontend:** React + TypeScript + Vite + React Flow
-- **Backend:** Node + Express + TypeScript + Prisma
+- **Backend:** Node + Express + TypeScript + node-postgres (pg) + raw SQL
 - **Database:** PostgreSQL
 - **File storage:** local disk (dev / single-server) — swappable for S3/R2
 
@@ -13,9 +13,9 @@ role-clarity documents, and the full change history live in PostgreSQL + object 
 not the browser.
 
 ```
-client (React + React Flow)  ──REST/JSON──►  server (Express)  ──►  PostgreSQL
-                                                   │
-                                                   └──►  uploads/ (files)
+frontend (React + React Flow)  ──REST/JSON──►  backend (Express)  ──►  PostgreSQL
+                                                     │
+                                                     └──►  uploads/ (files)
 ```
 
 ---
@@ -24,8 +24,8 @@ client (React + React Flow)  ──REST/JSON──►  server (Express)  ──�
 
 ```
 nsi/
-├─ client/          React + Vite frontend
-├─ server/          Express + Prisma backend (also serves the built client in prod)
+├─ frontend/        React + Vite app
+├─ backend/         Express + pg API (also serves the built frontend in prod)
 ├─ docker-compose.yml   local PostgreSQL
 └─ package.json     root scripts to run both apps
 ```
@@ -45,10 +45,10 @@ docker compose up -d        # starts Postgres on localhost:5432
 ### 2. Backend
 
 ```bash
-cd server
+cd backend
 cp .env.example .env        # adjust DATABASE_URL if needed
 npm install
-npm run db:migrate          # create tables
+npm run db:setup            # create tables (also auto-created on server boot)
 npm run db:seed             # load the real MHS org structure
 npm run dev                 # API on http://localhost:4000
 ```
@@ -56,7 +56,7 @@ npm run dev                 # API on http://localhost:4000
 ### 3. Frontend
 
 ```bash
-cd client
+cd frontend
 npm install
 npm run dev                 # app on http://localhost:5173 (proxies /api → :4000)
 ```
@@ -87,14 +87,14 @@ The Express server can serve the built React app, so you deploy **one service** 
 managed Postgres.
 
 ```bash
-cd client && npm run build          # outputs client/dist
-cd ../server && npm run build       # compiles TS → dist
+cd frontend && npm run build          # outputs frontend/dist
+cd ../backend && npm run build       # compiles TS → dist
 NODE_ENV=production npm start       # serves API + client on PORT
 ```
 
 Recommended hosts: Render / Railway (long-running Node + managed Postgres + a persistent
 disk for `uploads/`). For multi-instance hosting, switch file storage to S3/R2 (see
-`server/src/storage.ts`).
+`backend/src/storage.ts`).
 
 ### Environment variables (server)
 
@@ -114,6 +114,6 @@ If you already made edits in the old HTML and downloaded a `mhs_orgchart_*.html`
 import its embedded state:
 
 ```bash
-cd server
+cd backend
 npm run import -- "C:/path/to/mhs_orgchart_2026-01-01.html"
 ```

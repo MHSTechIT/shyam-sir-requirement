@@ -1,36 +1,32 @@
-# Single-image build: compiles the React client and the Express/Prisma server,
-# then serves both from the Node server. Provide DATABASE_URL at runtime.
+# Single-image build: compiles the React frontend and the Express backend,
+# then serves both from the Node backend. Provide DATABASE_URL at runtime.
 FROM node:22-slim AS build
 WORKDIR /app
 
-# Prisma needs OpenSSL.
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
-
 # Install deps (root + both workspaces) using lockfiles where present.
 COPY package*.json ./
-COPY server/package*.json ./server/
-COPY client/package*.json ./client/
-RUN npm install && npm --prefix server install && npm --prefix client install
+COPY backend/package*.json ./backend/
+COPY frontend/package*.json ./frontend/
+RUN npm install && npm --prefix backend install && npm --prefix frontend install
 
 # Build.
 COPY . .
-RUN npm --prefix client run build \
- && npm --prefix server run build
+RUN npm --prefix frontend run build \
+ && npm --prefix backend run build
 
 FROM node:22-slim AS runtime
 WORKDIR /app
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
-ENV UPLOAD_DIR=/app/server/uploads
+ENV UPLOAD_DIR=/app/backend/uploads
 
-# Copy server runtime + generated Prisma client + built client assets.
-COPY --from=build /app/server/dist ./server/dist
-COPY --from=build /app/server/node_modules ./server/node_modules
-COPY --from=build /app/server/package.json ./server/package.json
-COPY --from=build /app/server/prisma ./server/prisma
-COPY --from=build /app/client/dist ./client/dist
+# Copy backend runtime + SQL schema + built frontend assets.
+COPY --from=build /app/backend/dist ./backend/dist
+COPY --from=build /app/backend/node_modules ./backend/node_modules
+COPY --from=build /app/backend/package.json ./backend/package.json
+COPY --from=build /app/backend/db ./backend/db
+COPY --from=build /app/frontend/dist ./frontend/dist
 
 EXPOSE 4000
-WORKDIR /app/server
-# Apply migrations, then start.
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+WORKDIR /app/backend
+# The app creates tables on boot (ensureSchema), then starts serving.
+CMD ["node", "dist/index.js"]
