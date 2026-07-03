@@ -1,15 +1,13 @@
 import { Router } from "express";
 import multer from "multer";
-import fs from "fs";
 import crypto from "crypto";
 import { query, queryOne } from "../db";
 import { logAction } from "../history";
 import { serializeFile } from "../serialize";
-import { saveFile, resolveFile, deleteFile } from "../storage";
 
 const router = Router();
 
-// 4 MB cap — matches the old client limit.
+// 4 MB cap — matches the old client limit. File bytes are stored in Postgres.
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 4 * 1024 * 1024 },
@@ -33,39 +31,26 @@ router.post("/nodes/:id/file", upload.single("file"), async (req, res) => {
     return;
   }
 
-  // Remove previous file (one doc per node).
-  const prev = await queryOne<{ id: string; storageKey: string }>(
-    `SELECT "id","storageKey" FROM files WHERE "nodeId"=$1`,
-    [id]
-  );
-  if (prev) {
-    deleteFile(prev.storageKey);
-    await query(`DELETE FROM files WHERE "id"=$1`, [prev.id]);
-  }
+  // One doc per node — remove any previous.
+  await query(`DELETE FROM files WHERE "nodeId"=$1`, [id]);
 
-  const storageKey = saveFile(req.file.originalname, req.file.buffer);
   const rows = await query(
-    `INSERT INTO files ("id","nodeId","name","mimeType","size","storageKey")
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-    [newId(), id, req.file.originalname, req.file.mimetype, req.file.size, storageKey]
+    `INSERT INTO files ("id","nodeId","name","mimeType","size","data")
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING "id","nodeId","name","mimeType","size"`,
+    [newId(), id, req.file.originalname, req.file.mimetype, req.file.size, req.file.buffer]
   );
   await logAction(`Attached document "${rows[0].name}" to "${node.title}"`, { nodeId: id });
   res.status(201).json(serializeFile(rows[0]));
 });
 
-// GET /api/files/:id — stream the file (inline, for preview)
+// GET /api/files/:id — stream the file from the DB (inline, for preview)
 router.get("/files/:id", async (req, res) => {
-  const file = await queryOne<{ name: string; mimeType: string; storageKey: string }>(
-    `SELECT "name","mimeType","storageKey" FROM files WHERE "id"=$1`,
+  const file = await queryOne<{ name: string; mimeType: string; data: Buffer | null }>(
+    `SELECT "name","mimeType","data" FROM files WHERE "id"=$1`,
     [req.params.id]
   );
-  if (!file) {
+  if (!file || !file.data) {
     res.status(404).json({ error: "File not found" });
-    return;
-  }
-  const path = resolveFile(file.storageKey);
-  if (!fs.existsSync(path)) {
-    res.status(410).json({ error: "File bytes missing from storage" });
     return;
   }
   res.setHeader("Content-Type", file.mimeType || "application/octet-stream");
@@ -73,20 +58,19 @@ router.get("/files/:id", async (req, res) => {
     "Content-Disposition",
     `inline; filename="${encodeURIComponent(file.name)}"`
   );
-  fs.createReadStream(path).pipe(res);
+  res.end(file.data);
 });
 
 // DELETE /api/files/:id
 router.delete("/files/:id", async (req, res) => {
-  const file = await queryOne<{ id: string; name: string; nodeId: string; storageKey: string }>(
-    `SELECT "id","name","nodeId","storageKey" FROM files WHERE "id"=$1`,
+  const file = await queryOne<{ id: string; name: string; nodeId: string }>(
+    `SELECT "id","name","nodeId" FROM files WHERE "id"=$1`,
     [req.params.id]
   );
   if (!file) {
     res.status(404).json({ error: "File not found" });
     return;
   }
-  deleteFile(file.storageKey);
   await query(`DELETE FROM files WHERE "id"=$1`, [file.id]);
   await logAction(`Removed document "${file.name}"`, { nodeId: file.nodeId });
   res.json({ ok: true });

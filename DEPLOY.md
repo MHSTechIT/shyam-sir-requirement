@@ -32,16 +32,15 @@ Deploy the **backend first** (you need its URL for the frontend), then the front
    |---|---|
    | `DATABASE_URL` | `postgresql://postgres:%24erver2026@13.202.225.50:5432/nsi_team?schema=public` |
    | `NODE_ENV` | `production` |
-   | `UPLOAD_DIR` | `/var/data/uploads` |
 
    > The `$` in the password is written as `%24` (URL-encoded) — paste it exactly.
-4. **Add a Disk** (so uploaded documents survive redeploys):
-   Name `uploads`, Mount Path `/var/data`, Size `1 GB`.
-5. **Create Web Service.** Wait for "Live", then test:
+   > **No disk needed** — uploaded documents are stored inside PostgreSQL, which
+   > is already persistent.
+4. **Create Web Service.** Wait for "Live", then test:
    `https://<your-service>.onrender.com/api/health` → must return `{"ok":true}`.
-6. Copy the service URL, e.g. `https://mhs-orgchart-api.onrender.com`.
+5. Copy the service URL, e.g. `https://mhs-orgchart-api.onrender.com`.
 
-> **Shortcut:** instead of steps 1–4, use **New + → Blueprint** and pick the repo —
+> **Shortcut:** instead of steps 1–3, use **New + → Blueprint** and pick the repo —
 > Render reads `render.yaml` and pre-fills everything; you only set `DATABASE_URL`.
 
 > **Fresh database?** If you point `DATABASE_URL` at a brand-new empty DB, open the
@@ -91,7 +90,7 @@ Every `git push` to `main` now auto-redeploys both.
 | Vercel build fails immediately | Root Directory not set to `frontend`. |
 | App loads but "Couldn't load the chart / timed out" | `VITE_API_URL` missing or wrong on Vercel, or backend asleep (free tier) — wait ~60s and Retry. |
 | Browser console: CORS error | Set `CLIENT_ORIGIN` on Render to the exact Vercel URL (no trailing slash). |
-| Uploaded documents vanish after redeploy | Add the Render Disk (step A.5) and set `UPLOAD_DIR=/var/data/uploads`. |
+| Uploaded documents | Stored inside PostgreSQL (`files.data`), so they persist across redeploys automatically — no disk needed. |
 | Render free service slow first load | Free instances sleep after ~15 min idle; first request wakes it (~30–60s). Upgrade to avoid. |
 
 ---

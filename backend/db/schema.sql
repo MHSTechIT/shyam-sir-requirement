@@ -34,9 +34,13 @@ CREATE TABLE IF NOT EXISTS files (
   "name"       TEXT NOT NULL,
   "mimeType"   TEXT NOT NULL,
   "size"       INTEGER NOT NULL,
-  "storageKey" TEXT NOT NULL,
+  "storageKey" TEXT,
+  "data"       BYTEA,
   "createdAt"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- Store file bytes in the DB (no disk needed). Bring older tables up to date:
+ALTER TABLE files ADD COLUMN IF NOT EXISTS "data" BYTEA;
+ALTER TABLE files ALTER COLUMN "storageKey" DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS history (
   "id"      SERIAL PRIMARY KEY,

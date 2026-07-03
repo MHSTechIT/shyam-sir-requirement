@@ -15,16 +15,10 @@ services:
     # No migration step needed — the app creates tables on boot (ensureSchema).
     startCommand: npm start
     healthCheckPath: /api/health
-    # Persistent disk so uploaded role-clarity documents survive deploys.
-    disk:
-      name: uploads
-      mountPath: /var/data
-      sizeGB: 1
+    # No disk needed — uploaded documents are stored in PostgreSQL (files.data).
     envVars:
       - key: NODE_ENV
         value: production
-      - key: UPLOAD_DIR
-        value: /var/data/uploads
       - key: DATABASE_URL
         sync: false # set in the Render dashboard (your Postgres URL)
       - key: CLIENT_ORIGIN

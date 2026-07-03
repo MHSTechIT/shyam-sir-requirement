@@ -8,7 +8,6 @@
  */
 import fs from "fs";
 import { pool, query, ensureSchema } from "../src/db";
-import { saveFile } from "../src/storage";
 
 const DEFAULT_CLARITY = {
   reports_to: "", dept: "", responsibilities: "",
@@ -99,16 +98,15 @@ async function main() {
     if (!f?.dataUrl) continue;
     try {
       const { buffer } = dataUrlToBuffer(f.dataUrl);
-      const storageKey = saveFile(f.name || "document", buffer);
       await query(
-        `INSERT INTO files ("id","nodeId","name","mimeType","size","storageKey")
+        `INSERT INTO files ("id","nodeId","name","mimeType","size","data")
          VALUES ($1,$2,$3,$4,$5,$6)
          ON CONFLICT ("nodeId") DO UPDATE SET
            "name"=EXCLUDED."name","mimeType"=EXCLUDED."mimeType",
-           "size"=EXCLUDED."size","storageKey"=EXCLUDED."storageKey"`,
+           "size"=EXCLUDED."size","data"=EXCLUDED."data"`,
         [
           `file_${nodeId}`, nodeId, f.name || "document",
-          f.type || "application/octet-stream", f.size || buffer.length, storageKey,
+          f.type || "application/octet-stream", f.size || buffer.length, buffer,
         ]
       );
       fileCount++;
