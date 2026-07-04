@@ -29,9 +29,22 @@ const app = express();
 const PORT = parseInt(process.env.PORT || "4000", 10);
 const SHARED_PASSWORD = process.env.SHARED_PASSWORD || "";
 
+// Allowed origins from CLIENT_ORIGIN (comma-separated), normalised so a stray
+// trailing slash can't break CORS. Empty → allow any origin (reflect it).
+const norm = (s: string) => s.trim().replace(/\/+$/, "");
+const allowList = (process.env.CLIENT_ORIGIN || "")
+  .split(",")
+  .map(norm)
+  .filter(Boolean);
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || true,
+    origin(origin, cb) {
+      if (!allowList.length || !origin || allowList.includes(norm(origin))) {
+        cb(null, true); // reflects the request's own origin (needed for cookies)
+      } else {
+        cb(null, false);
+      }
+    },
     credentials: true,
   })
 );
