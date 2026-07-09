@@ -3,7 +3,7 @@ import { FileText, Image as ImageIcon, Paperclip, Eye, Save, X, Plus } from "luc
 import { useOrg } from "../store/orgStore";
 import { useUi } from "../store/uiStore";
 import { api } from "../api/client";
-import { NODE_W, NODE_H } from "../lib/constants";
+import { NODE_W, NODE_H, SIZE_PRESETS } from "../lib/constants";
 import type { Status, HistoryEntry } from "../types";
 
 const TABS = [
@@ -333,7 +333,20 @@ export function SidePanel() {
 
         {tab === "size" && (
           <>
-            <div className="sp-field-label">Node Width</div>
+            <div className="sp-field-label">Size Presets</div>
+            <div className="sp-size-presets">
+              {SIZE_PRESETS.map((p) => (
+                <button
+                  key={p.key}
+                  className={`sp-preset-btn ${f.w === p.w && f.h === p.h ? "active" : ""}`}
+                  onClick={() => setF({ ...f, w: p.w, h: p.h })}
+                  title={`${p.w}×${p.h}`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div className="sp-field-label" style={{ marginTop: 12 }}>Node Width</div>
             <div className="sp-size-row">
               <label>W</label>
               <input type="range" min={140} max={400} step={5} value={f.w} onChange={(e) => setF({ ...f, w: +e.target.value })} />

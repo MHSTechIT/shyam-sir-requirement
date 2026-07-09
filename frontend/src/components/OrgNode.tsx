@@ -1,4 +1,4 @@
-import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
+import { Handle, Position, NodeResizer, type NodeProps, type Node } from "@xyflow/react";
 import { Plus, Minus, Info, Palette, X, Paperclip } from "lucide-react";
 import { useOrg } from "../store/orgStore";
 import { useUi } from "../store/uiStore";
@@ -7,12 +7,13 @@ import { STATUS_META } from "../lib/icons";
 export type OrgNodeData = { nodeId: string };
 type OrgFlowNode = Node<OrgNodeData, "org">;
 
-export function OrgNode({ data }: NodeProps<OrgFlowNode>) {
+export function OrgNode({ data, selected }: NodeProps<OrgFlowNode>) {
   const node = useOrg((s) => s.nodes[data.nodeId]);
   const hasFile = useOrg((s) => Boolean(s.files[data.nodeId]));
   const connections = useOrg((s) => s.connections);
   const currentView = useOrg((s) => s.currentView);
   const deleteNode = useOrg((s) => s.deleteNode);
+  const updateNode = useOrg((s) => s.updateNode);
   const toggleCollapse = useOrg((s) => s.toggleCollapse);
   const openSidePanel = useUi((s) => s.openSidePanel);
   const openColor = useUi((s) => s.openColor);
@@ -28,7 +29,22 @@ export function OrgNode({ data }: NodeProps<OrgFlowNode>) {
   const hire = node.hc ? Math.max(0, node.hc.req - node.hc.have) : 0;
 
   return (
-    <div className="org-node" style={node.size ? { width: node.size.w } : undefined}>
+    <div
+      className="org-node"
+      style={{ width: "100%", height: node.size ? "100%" : undefined }}
+    >
+      <NodeResizer
+        isVisible={!!selected}
+        minWidth={140}
+        minHeight={80}
+        lineClassName="nr-line"
+        handleClassName="nr-handle"
+        onResizeEnd={(_e, p) =>
+          updateNode(node.id, {
+            size: { w: Math.round(p.width), h: Math.round(p.height) },
+          })
+        }
+      />
       <Handle type="target" position={Position.Top} />
       <div className="node-strip" style={{ background: node.color }} />
 

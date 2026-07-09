@@ -7,12 +7,16 @@ import {
   Redo2,
   Save,
   Palette,
+  MousePointer2,
+  Hand,
+  Network,
   type LucideIcon,
 } from "lucide-react";
 import { useOrg } from "../store/orgStore";
 import { useUi } from "../store/uiStore";
 import { VIEW_TABS, CANVAS_VIEWS } from "../lib/constants";
 import { VIEW_ICONS } from "../lib/icons";
+import { autoLayout } from "../lib/autoLayout";
 import type { LineStyle } from "../types";
 
 const LINE_STYLES: { key: LineStyle; icon: LucideIcon; title: string }[] = [
@@ -39,8 +43,21 @@ export function Toolbar() {
   } = useOrg();
   const openAddNode = useUi((s) => s.openAddNode);
   const openGroups = useUi((s) => s.openGroups);
+  const canvasMode = useUi((s) => s.canvasMode);
+  const setCanvasMode = useUi((s) => s.setCanvasMode);
 
   const isCanvas = CANVAS_VIEWS.includes(currentView);
+
+  const runAutoLayout = () => {
+    const s = useOrg.getState();
+    const updates = autoLayout(s.currentView, s.filters, s.nodes, s.connections);
+    if (!updates.length) {
+      s.toast("Nothing to arrange in this view", "warn");
+      return;
+    }
+    s.persistPositions(updates);
+    s.toast(`Auto-arranged ${updates.length} node${updates.length > 1 ? "s" : ""}`);
+  };
   const TitleIcon = VIEW_ICONS[currentView];
   const title = VIEW_TABS.find((t) => t.key === currentView)?.label ?? "";
 
@@ -86,6 +103,28 @@ export function Toolbar() {
             <button className="tb-btn" onClick={openAddNode}>
               <Plus size={15} />
               Node
+            </button>
+            <div className="tb-sep" />
+            <div className="ls-controls" title="Pointer mode">
+              <button
+                className={`ls-btn ${canvasMode === "move" ? "active" : ""}`}
+                title="Move / pan (drag to pan canvas)"
+                onClick={() => setCanvasMode("move")}
+              >
+                <Hand size={15} />
+              </button>
+              <button
+                className={`ls-btn ${canvasMode === "select" ? "active" : ""}`}
+                title="Select (drag to box-select nodes)"
+                onClick={() => setCanvasMode("select")}
+              >
+                <MousePointer2 size={15} />
+              </button>
+            </div>
+            <div className="tb-sep" />
+            <button className="tb-btn" onClick={runAutoLayout} title="Auto-arrange nodes (top-down)">
+              <Network size={15} />
+              Auto Layout
             </button>
             <div className="tb-sep" />
             <div className="ls-controls" title="Connection line style">

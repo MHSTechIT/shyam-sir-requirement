@@ -45,6 +45,7 @@ interface OrgStore {
   undoStack: Snapshot[];
   redoStack: Snapshot[];
   lastSavedAt: number | null;
+  clipboard: Snapshot | null;
   // explicit-save model
   dirty: boolean;
   pending: PendingAction[];
@@ -71,6 +72,10 @@ interface OrgStore {
     opts?: { silent?: boolean; record?: boolean }
   ) => void;
   deleteNode: (id: string) => void;
+  deleteNodes: (ids: string[]) => void;
+  copyNodes: (ids: string[]) => void;
+  pasteClipboard: () => void;
+  duplicateNodes: (ids: string[]) => void;
   toggleCollapse: (id: string) => void;
   persistPositions: (
     updates: Array<{ id: string; x: number; y: number }>
@@ -113,6 +118,36 @@ function newId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Deep-clone a set of nodes (+ the connections wholly between them), assigning
+// fresh ids and offsetting positions. Used by copy/paste and duplicate.
+function cloneSelection(
+  srcNodes: OrgNode[],
+  allConnections: Connection[],
+  dx: number,
+  dy: number
+): { nodes: OrgNode[]; connections: Connection[] } {
+  const idMap = new Map<string, string>();
+  const nodes = srcNodes.map((n) => {
+    const id = newId("nd");
+    idMap.set(n.id, id);
+    return {
+      ...structuredClone(n),
+      id,
+      x: Math.round(n.x + dx),
+      y: Math.round(n.y + dy),
+    };
+  });
+  const connections = allConnections
+    .filter((c) => idMap.has(c.from) && idMap.has(c.to))
+    .map((c) => ({
+      ...c,
+      id: newId("cn"),
+      from: idMap.get(c.from)!,
+      to: idMap.get(c.to)!,
+    }));
+  return { nodes, connections };
+}
+
 let toastSeq = 0;
 
 export const useOrg = create<OrgStore>((set, get) => {
@@ -147,6 +182,7 @@ export const useOrg = create<OrgStore>((set, get) => {
     undoStack: [],
     redoStack: [],
     lastSavedAt: null,
+    clipboard: null,
     dirty: false,
     pending: [],
     saving: false,
@@ -264,6 +300,68 @@ export const useOrg = create<OrgStore>((set, get) => {
       });
       mark(`Deleted node "${node?.title ?? id}"`, id);
       get().toast(`Deleted "${node?.title ?? "node"}" (unsaved)`);
+    },
+
+    deleteNodes: (ids) => {
+      const idSet = new Set(ids.filter((id) => get().nodes[id]));
+      if (!idSet.size) return;
+      pushUndo();
+      set((s) => {
+        const nodes = { ...s.nodes };
+        for (const id of idSet) delete nodes[id];
+        return {
+          nodes,
+          connections: s.connections.filter((c) => !idSet.has(c.from) && !idSet.has(c.to)),
+          selectedNodeId: null,
+        };
+      });
+      mark(`Deleted ${idSet.size} node${idSet.size > 1 ? "s" : ""}`);
+      get().toast(`Deleted ${idSet.size} node${idSet.size > 1 ? "s" : ""} (unsaved)`);
+    },
+
+    copyNodes: (ids) => {
+      const srcNodes = ids.map((id) => get().nodes[id]).filter(Boolean) as OrgNode[];
+      if (!srcNodes.length) {
+        set({ clipboard: null });
+        return;
+      }
+      const chosen = new Set(srcNodes.map((n) => n.id));
+      const connections = get().connections.filter(
+        (c) => chosen.has(c.from) && chosen.has(c.to)
+      );
+      set({ clipboard: structuredClone({ nodes: Object.fromEntries(srcNodes.map((n) => [n.id, n])), connections }) });
+      get().toast(`Copied ${srcNodes.length} node${srcNodes.length > 1 ? "s" : ""}`);
+    },
+
+    pasteClipboard: () => {
+      const clip = get().clipboard;
+      if (!clip) return;
+      const srcNodes = Object.values(clip.nodes);
+      if (!srcNodes.length) return;
+      pushUndo();
+      const view = get().currentView;
+      const { nodes, connections } = cloneSelection(srcNodes, clip.connections, 40, 40);
+      // paste into the current canvas view so the copies are visible here
+      const placed = nodes.map((n) => ({ ...n, view }));
+      set((s) => ({
+        nodes: { ...s.nodes, ...Object.fromEntries(placed.map((n) => [n.id, n])) },
+        connections: [...s.connections, ...connections.map((c) => ({ ...c, view }))],
+      }));
+      mark(`Pasted ${placed.length} node${placed.length > 1 ? "s" : ""}`);
+      get().toast(`Pasted ${placed.length} node${placed.length > 1 ? "s" : ""} (unsaved)`);
+    },
+
+    duplicateNodes: (ids) => {
+      const srcNodes = ids.map((id) => get().nodes[id]).filter(Boolean) as OrgNode[];
+      if (!srcNodes.length) return;
+      pushUndo();
+      const { nodes, connections } = cloneSelection(srcNodes, get().connections, 40, 40);
+      set((s) => ({
+        nodes: { ...s.nodes, ...Object.fromEntries(nodes.map((n) => [n.id, n])) },
+        connections: [...s.connections, ...connections],
+      }));
+      mark(`Duplicated ${nodes.length} node${nodes.length > 1 ? "s" : ""}`);
+      get().toast(`Duplicated ${nodes.length} node${nodes.length > 1 ? "s" : ""} (unsaved)`);
     },
 
     toggleCollapse: (id) => {

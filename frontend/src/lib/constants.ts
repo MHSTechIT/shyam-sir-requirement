@@ -3,6 +3,14 @@ import type { Clarity } from "../types";
 export const NODE_W = 200;
 export const NODE_H = 110;
 
+// Manual size presets (user picks; not tied to a designation taxonomy).
+export const SIZE_PRESETS = [
+  { key: "sm", label: "Small", w: 160, h: 88 },
+  { key: "md", label: "Medium", w: 200, h: 110 },
+  { key: "lg", label: "Large", w: 240, h: 140 },
+  { key: "xl", label: "X-Large", w: 300, h: 170 },
+] as const;
+
 export const DEFAULT_CLARITY: Clarity = {
   reports_to: "",
   dept: "",
@@ -40,7 +48,7 @@ export const PROJECT_FILTERS = [
 export const CANVAS_VIEWS = ["master", "wc", "vsl", "col"];
 
 export const VIEW_TABS = [
-  { key: "master", label: "Master" },
+  { key: "master", label: "R&D Team Structure" },
   { key: "scorecard", label: "Scorecards" },
   { key: "table", label: "Headcount" },
   { key: "history", label: "History" },

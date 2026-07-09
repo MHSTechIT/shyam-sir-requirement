@@ -29,7 +29,9 @@ interface UiStore {
   color: ColorTarget | null;
   fullscreen: boolean;
   groupsOpen: boolean;
+  canvasMode: "move" | "select";
 
+  setCanvasMode: (m: "move" | "select") => void;
   setFullscreen: (v: boolean) => void;
   openGroups: () => void;
   closeGroups: () => void;
@@ -53,7 +55,9 @@ export const useUi = create<UiStore>((set) => ({
   color: null,
   fullscreen: false,
   groupsOpen: false,
+  canvasMode: "move",
 
+  setCanvasMode: (canvasMode) => set({ canvasMode }),
   setFullscreen: (v) => set({ fullscreen: v }),
   openGroups: () => set({ groupsOpen: true }),
   closeGroups: () => set({ groupsOpen: false }),
