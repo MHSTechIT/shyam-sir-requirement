@@ -14,6 +14,8 @@ import {
   Search,
   MapPin,
   Clock,
+  CircleSlash,
+  CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -47,4 +49,7 @@ export const STATUS_META: Record<
   hiring: { icon: Search, label: "Hiring", cls: "ntag-hiring" },
   future: { icon: MapPin, label: "Future", cls: "ntag-future" },
   notice: { icon: Clock, label: "Notice", cls: "ntag-notice" },
+  inactive: { icon: CircleSlash, label: "Inactive", cls: "ntag-inactive" },
+  future_plan: { icon: MapPin, label: "Future Plan", cls: "ntag-future" },
+  upcoming: { icon: CalendarClock, label: "Upcoming", cls: "ntag-upcoming" },
 };

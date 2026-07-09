@@ -111,7 +111,8 @@ function loadFilters(): Record<string, boolean> {
 }
 function loadLineStyle(): LineStyle {
   const v = localStorage.getItem(LINESTYLE_KEY);
-  return v === "straight" || v === "orthogonal" ? v : "curved";
+  // Default to the shared-bus orthogonal connector (clean org-chart tree lines).
+  return v === "straight" || v === "curved" ? v : "orthogonal";
 }
 
 function newId(prefix: string): string {
@@ -153,6 +154,15 @@ const STATUS_LABELS: Record<string, string> = {
   hiring: "Hiring",
   future: "Future Hire",
   notice: "On Notice",
+  inactive: "Inactive",
+  future_plan: "Future Plan",
+  upcoming: "Upcoming",
+};
+
+const KIND_LABELS: Record<string, string> = {
+  team: "Team",
+  project: "Project",
+  people: "People",
 };
 
 function trunc(s: string, n = 60): string {
@@ -188,8 +198,15 @@ function diffNode(prev: OrgNode, next: OrgNode): string[] {
 
   const pc = prev.clarity ?? ({} as OrgNode["clarity"]);
   const nc = next.clarity ?? ({} as OrgNode["clarity"]);
+  if (pc.kind !== nc.kind && nc.kind) {
+    out.push(`Tag: ${KIND_LABELS[pc.kind] ?? pc.kind ?? "—"} → ${KIND_LABELS[nc.kind] ?? nc.kind}`);
+  }
+  push(textChange("Role title", pc.role_title || "", nc.role_title || ""));
+  push(textChange("Project Lead", pc.project_lead || "", nc.project_lead || ""));
   push(textChange("Reports To", pc.reports_to || "", nc.reports_to || ""));
   push(textChange("Department", pc.dept || "", nc.dept || ""));
+  push(textChange("Goals", pc.goals || "", nc.goals || ""));
+  push(textChange("Team Process", pc.team_process || "", nc.team_process || ""));
   push(textChange("R&R", pc.responsibilities || "", nc.responsibilities || ""));
   push(textChange("Document link", pc.doc_link || "", nc.doc_link || ""));
   push(textChange("Document notes", pc.doc_notes || "", nc.doc_notes || ""));

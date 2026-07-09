@@ -1,6 +1,15 @@
 // Mirrors server/src/types.ts
 
-export type Status = "active" | "hiring" | "future" | "notice";
+export type Status =
+  | "active"
+  | "hiring"
+  | "future"
+  | "notice"
+  | "inactive"
+  | "future_plan"
+  | "upcoming";
+
+export type NodeKind = "team" | "project" | "people";
 
 export interface Headcount {
   req: number;
@@ -22,6 +31,12 @@ export interface Clarity {
   kras: string[];
   doc_notes: string;
   doc_link: string;
+  // Phase 2 — Team / Project / People node kinds
+  kind: NodeKind;
+  role_title: string; // People: the designation "Title" (shown as the card badge)
+  project_lead: string; // Project / People
+  goals: string; // Team Goal / Project Goals / People Goals
+  team_process: string; // Team only
 }
 
 export interface OrgNode {

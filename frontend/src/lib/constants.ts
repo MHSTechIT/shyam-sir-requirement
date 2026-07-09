@@ -19,6 +19,11 @@ export const DEFAULT_CLARITY: Clarity = {
   kras: [],
   doc_notes: "",
   doc_link: "",
+  kind: "people",
+  role_title: "",
+  project_lead: "",
+  goals: "",
+  team_process: "",
 };
 
 export const COLOR_PALETTE = [

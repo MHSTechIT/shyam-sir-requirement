@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { useReactFlow } from "@xyflow/react";
 import { useOrg } from "../store/orgStore";
 import { useUi } from "../store/uiStore";
+import { Select } from "./Select";
 import { COLOR_PALETTE } from "../lib/constants";
 import type { Status } from "../types";
 
@@ -81,12 +82,16 @@ export function AddNodeModal() {
         </div>
         <div className="sp-field">
           <div className="sp-field-label">Status</div>
-          <select className="sp-select" value={status} onChange={(e) => setStatus(e.target.value as Status)}>
-            <option value="active">Active</option>
-            <option value="hiring">Hiring</option>
-            <option value="future">Future</option>
-            <option value="notice">Notice</option>
-          </select>
+          <Select
+            value={status}
+            onChange={(v) => setStatus(v as Status)}
+            options={[
+              { value: "active", label: "Active" },
+              { value: "hiring", label: "Hiring" },
+              { value: "future", label: "Future" },
+              { value: "notice", label: "Notice" },
+            ]}
+          />
         </div>
         <div className="sp-field">
           <div className="sp-field-label" style={{ display: "flex", justifyContent: "space-between" }}>
@@ -99,12 +104,14 @@ export function AddNodeModal() {
               + New color
             </button>
           </div>
-          <select className="sp-select" value={project} onChange={(e) => pickGroup(e.target.value)}>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-            <option value="shared">Shared (no filter)</option>
-          </select>
+          <Select
+            value={project}
+            onChange={(v) => pickGroup(v)}
+            options={[
+              ...groups.map((g) => ({ value: g.id, label: g.name })),
+              { value: "shared", label: "Shared (no filter)" },
+            ]}
+          />
         </div>
         <div className="sp-field">
           <div className="sp-field-label">Color</div>

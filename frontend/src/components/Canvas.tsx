@@ -23,6 +23,7 @@ import { toggleFullscreen } from "../lib/fullscreen";
 import { useOrg } from "../store/orgStore";
 import { useUi } from "../store/uiStore";
 import { OrgNode, type OrgNodeData } from "./OrgNode";
+import { OrgEdge } from "./OrgEdge";
 import { HelperLines } from "./HelperLines";
 import { getHelperLines } from "../lib/helperLines";
 import { isNodeVisible } from "../lib/selectors";
@@ -32,7 +33,7 @@ import type { LineStyle } from "../types";
 const EDGE_TYPE: Record<LineStyle, string> = {
   curved: "default",
   straight: "straight",
-  orthogonal: "smoothstep",
+  orthogonal: "org",
 };
 
 const INFO: Record<string, string> = {
@@ -64,6 +65,7 @@ export function Canvas() {
   const rf = useReactFlow();
 
   const nodeTypes = useMemo(() => ({ org: OrgNode }), []);
+  const edgeTypes = useMemo(() => ({ org: OrgEdge }), []);
 
   const [rfNodes, setRfNodes, onNodesChangeBase] = useNodesState<RFNode<OrgNodeData>>([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<RFEdge>([]);
@@ -234,6 +236,7 @@ export function Canvas() {
           nodes={rfNodes}
           edges={rfEdges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}

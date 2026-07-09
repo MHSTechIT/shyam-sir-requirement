@@ -3,19 +3,67 @@ import { FileText, Image as ImageIcon, Paperclip, Eye, Save, X, Plus } from "luc
 import { useOrg } from "../store/orgStore";
 import { useUi } from "../store/uiStore";
 import { api } from "../api/client";
+import { Select } from "./Select";
 import { NODE_W, NODE_H, SIZE_PRESETS } from "../lib/constants";
-import type { Status, HistoryEntry } from "../types";
+import type { Status, NodeKind, HistoryEntry } from "../types";
 
-const TABS = [
-  ["overview", "Overview"],
-  ["hc", "Headcount"],
-  ["rr", "R&R"],
-  ["kpi", "KPIs"],
-  ["kra", "KRAs"],
-  ["doc", "Document"],
-  ["size", "Size"],
-] as const;
-type Tab = (typeof TABS)[number][0];
+// Which section tabs each node kind exposes (label per kind for the shared keys).
+const TABS_BY_KIND: Record<NodeKind, [string, string][]> = {
+  team: [
+    ["overview", "Overview"],
+    ["hc", "Headcount"],
+    ["goal", "Team Goal"],
+    ["process", "Team Process"],
+    ["rr", "R&R"],
+    ["kpi", "KPIs"],
+    ["kra", "KRAs"],
+    ["doc", "Document"],
+    ["size", "Size"],
+  ],
+  project: [
+    ["overview", "Overview"],
+    ["goal", "Goals"],
+    ["rr", "R&R"],
+    ["kpi", "KPIs"],
+    ["kra", "KRAs"],
+    ["doc", "Document"],
+    ["size", "Size"],
+  ],
+  people: [
+    ["overview", "Overview"],
+    ["goal", "Goals"],
+    ["rr", "R&R"],
+    ["kpi", "KPIs"],
+    ["kra", "KRAs"],
+    ["doc", "Document"],
+    ["size", "Size"],
+  ],
+};
+
+// Status options per kind (value → label).
+const STATUS_OPTS: Record<NodeKind, [Status, string][]> = {
+  team: [
+    ["active", "Active"],
+    ["inactive", "Inactive"],
+    ["future_plan", "Future Plan"],
+  ],
+  project: [
+    ["active", "Active"],
+    ["inactive", "Inactive"],
+    ["upcoming", "Upcoming Project"],
+  ],
+  people: [
+    ["active", "Active"],
+    ["inactive", "Inactive"],
+    ["upcoming", "Upcoming Project"],
+  ],
+};
+
+const KIND_LABEL: Record<NodeKind, string> = {
+  team: "Team",
+  project: "Project",
+  people: "People",
+};
 
 function fmtBytes(b: number) {
   if (b < 1024) return b + " B";
@@ -36,21 +84,24 @@ export function SidePanel() {
   // this node's activity log.
   const lastSavedAt = useOrg((s) => s.lastSavedAt);
 
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<string>("overview");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
 
   // form state
   const [f, setF] = useState({
+    kind: "people" as NodeKind,
     title: "",
-    badge: "",
-    sub: "",
+    role_title: "",
+    project_lead: "",
     reports_to: "",
     dept: "",
     status: "active" as Status,
     req: 0,
     have: 0,
     notice: 0,
+    goals: "",
+    team_process: "",
     responsibilities: "",
     kpis: [] as string[],
     kras: [] as string[],
@@ -63,21 +114,25 @@ export function SidePanel() {
   useEffect(() => {
     if (!node) return;
     setTab("overview");
+    const c = node.clarity;
     setF({
+      kind: c?.kind || "people",
       title: node.title,
-      badge: node.badge,
-      sub: node.sub,
-      reports_to: node.clarity?.reports_to || "",
-      dept: node.clarity?.dept || node.project,
+      role_title: c?.role_title || node.badge || "",
+      project_lead: c?.project_lead || "",
+      reports_to: c?.reports_to || "",
+      dept: c?.dept || node.project,
       status: node.status,
       req: node.hc?.req || 0,
       have: node.hc?.have || 0,
       notice: node.hc?.notice || 0,
-      responsibilities: node.clarity?.responsibilities || "",
-      kpis: node.clarity?.kpis || [],
-      kras: node.clarity?.kras || [],
-      doc_notes: node.clarity?.doc_notes || "",
-      doc_link: node.clarity?.doc_link || "",
+      goals: c?.goals || "",
+      team_process: c?.team_process || "",
+      responsibilities: c?.responsibilities || "",
+      kpis: c?.kpis || [],
+      kras: c?.kras || [],
+      doc_notes: c?.doc_notes || "",
+      doc_link: c?.doc_link || "",
       w: node.size?.w || NODE_W,
       h: node.size?.h || NODE_H,
     });
@@ -104,27 +159,50 @@ export function SidePanel() {
 
   if (!node || !nodeId) return <div id="side-panel" />;
 
+  const tabs = TABS_BY_KIND[f.kind];
+  const statusOpts = STATUS_OPTS[f.kind];
+
+  // Switching kind: reset to a valid tab + a valid status for that kind.
+  const changeKind = (kind: NodeKind) => {
+    setF((s) => {
+      const validStatus = STATUS_OPTS[kind].some(([v]) => v === s.status);
+      return { ...s, kind, status: validStatus ? s.status : "active" };
+    });
+    setTab("overview");
+  };
+
   const save = () => {
     const req = Number(f.req) || 0;
     const have = Number(f.have) || 0;
     const notice = Number(f.notice) || 0;
     const hc =
-      req > 0 || have > 0 || notice > 0
+      f.kind === "team" && (req > 0 || have > 0 || notice > 0)
         ? { req, have, hire: Math.max(0, req - have), notice }
-        : null;
+        : f.kind === "team"
+        ? null
+        : node.hc; // non-team kinds keep whatever headcount they had (no HC tab)
     const w = Number(f.w) || NODE_W;
     const h = Number(f.h) || NODE_H;
     const size = w !== NODE_W || h !== NODE_H ? { w, h } : null;
+    // The card badge reflects the kind: People shows the designation Title,
+    // Team/Project show the kind label.
+    const badge =
+      f.kind === "people" ? f.role_title.trim() || "PEOPLE" : KIND_LABEL[f.kind].toUpperCase();
     updateNode(nodeId, {
       title: f.title || "Untitled",
-      badge: f.badge || "ROLE",
-      sub: f.sub,
+      badge,
+      sub: "",
       status: f.status,
       hc,
       size,
       clarity: {
+        kind: f.kind,
+        role_title: f.role_title,
+        project_lead: f.project_lead,
         reports_to: f.reports_to,
         dept: f.dept,
+        goals: f.goals,
+        team_process: f.team_process,
         responsibilities: f.responsibilities,
         kpis: f.kpis.map((x) => x.trim()).filter(Boolean),
         kras: f.kras.map((x) => x.trim()).filter(Boolean),
@@ -132,7 +210,7 @@ export function SidePanel() {
         doc_link: f.doc_link,
       },
     });
-    useOrg.getState().toast("Role updated — click Save to persist");
+    useOrg.getState().toast("Node updated — click Save to persist");
     close();
   };
 
@@ -175,6 +253,9 @@ export function SidePanel() {
     </>
   );
 
+  const nameLabel =
+    f.kind === "team" ? "Team Name" : f.kind === "project" ? "Project Name" : "Person Name";
+
   return (
     <div id="side-panel" className="show">
       <div className="sp-header">
@@ -186,7 +267,7 @@ export function SidePanel() {
       </div>
 
       <div className="sp-tabs">
-        {TABS.map(([k, label]) => (
+        {tabs.map(([k, label]) => (
           <button
             key={k}
             className={`sp-tab ${tab === k ? "active" : ""}`}
@@ -200,32 +281,67 @@ export function SidePanel() {
       <div className="sp-body">
         {tab === "overview" && (
           <>
-            <Field label="Title">
-              <input className="sp-input" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
-            </Field>
             <Field label="Badge / Role label">
-              <input className="sp-input" value={f.badge} onChange={(e) => setF({ ...f, badge: e.target.value })} />
+              <Select
+                value={f.kind}
+                onChange={(v) => changeKind(v as NodeKind)}
+                options={[
+                  { value: "team", label: "Team" },
+                  { value: "project", label: "Project" },
+                  { value: "people", label: "People" },
+                ]}
+              />
             </Field>
-            <Field label="Sub-text / Person name">
-              <input className="sp-input" value={f.sub} onChange={(e) => setF({ ...f, sub: e.target.value })} />
+
+            {f.kind === "people" && (
+              <Field label="Title">
+                <input
+                  className="sp-input"
+                  value={f.role_title}
+                  onChange={(e) => setF({ ...f, role_title: e.target.value })}
+                  placeholder="e.g. Manager, Team Lead, Sr Caller"
+                />
+              </Field>
+            )}
+
+            <Field label={nameLabel}>
+              <input
+                className="sp-input"
+                value={f.title}
+                onChange={(e) => setF({ ...f, title: e.target.value })}
+              />
             </Field>
+
+            {(f.kind === "project" || f.kind === "people") && (
+              <Field label="Project Lead">
+                <input
+                  className="sp-input"
+                  value={f.project_lead}
+                  onChange={(e) => setF({ ...f, project_lead: e.target.value })}
+                />
+              </Field>
+            )}
+
             <Field label="Reports To">
-              <input className="sp-input" value={f.reports_to} onChange={(e) => setF({ ...f, reports_to: e.target.value })} />
+              <input
+                className="sp-input"
+                value={f.reports_to}
+                onChange={(e) => setF({ ...f, reports_to: e.target.value })}
+              />
             </Field>
             <Field label="Department">
-              <input className="sp-input" value={f.dept} onChange={(e) => setF({ ...f, dept: e.target.value })} />
+              <input
+                className="sp-input"
+                value={f.dept}
+                onChange={(e) => setF({ ...f, dept: e.target.value })}
+              />
             </Field>
             <Field label="Status">
-              <select
-                className="sp-select"
+              <Select
                 value={f.status}
-                onChange={(e) => setF({ ...f, status: e.target.value as Status })}
-              >
-                <option value="active">Active</option>
-                <option value="hiring">Hiring</option>
-                <option value="future">Future Hire</option>
-                <option value="notice">On Notice Period</option>
-              </select>
+                onChange={(v) => setF({ ...f, status: v as Status })}
+                options={statusOpts.map(([v, label]) => ({ value: v, label }))}
+              />
             </Field>
           </>
         )}
@@ -247,6 +363,30 @@ export function SidePanel() {
           </>
         )}
 
+        {tab === "goal" && (
+          <Field label={f.kind === "team" ? "Team Goal" : "Goals"}>
+            <textarea
+              className="sp-textarea"
+              style={{ minHeight: 280 }}
+              value={f.goals}
+              onChange={(e) => setF({ ...f, goals: e.target.value })}
+              placeholder="Describe the goal(s)…"
+            />
+          </Field>
+        )}
+
+        {tab === "process" && (
+          <Field label="Team Process">
+            <textarea
+              className="sp-textarea"
+              style={{ minHeight: 280 }}
+              value={f.team_process}
+              onChange={(e) => setF({ ...f, team_process: e.target.value })}
+              placeholder="Describe the team's process / workflow…"
+            />
+          </Field>
+        )}
+
         {tab === "rr" && (
           <Field label="Roles & Responsibilities">
             <textarea
@@ -264,7 +404,7 @@ export function SidePanel() {
 
         {tab === "doc" && (
           <>
-            <div className="sp-field-label">Role Clarity Document</div>
+            <div className="sp-field-label">Document</div>
             <div
               className={`sp-upload-zone ${file ? "has-file" : ""}`}
               onClick={() => !file && fileInput.current?.click()}
@@ -310,7 +450,7 @@ export function SidePanel() {
                   <div className="sp-upload-icon">
                     <Paperclip size={26} />
                   </div>
-                  <div className="sp-upload-text">Click to upload Role Clarity document</div>
+                  <div className="sp-upload-text">Click to upload document</div>
                   <div className="sp-upload-sub">PDF, Word, or image • Max 4 MB</div>
                 </>
               )}
@@ -368,7 +508,7 @@ export function SidePanel() {
             Activity / History{history.length ? ` (${history.length})` : ""}
           </div>
           {history.length === 0 ? (
-            <div className="sp-hist-empty">No history yet for this role.</div>
+            <div className="sp-hist-empty">No history yet for this node.</div>
           ) : (
             history.map((h) => (
               <div className="sp-hist-card" key={h.id}>

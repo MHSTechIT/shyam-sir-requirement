@@ -627,6 +627,14 @@ canvas.helper-lines {
   background: #fee2e2;
   color: #b91c1c;
 }
+.ntag-inactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+.ntag-upcoming {
+  background: #e0e7ff;
+  color: #3730a3;
+}
 .ntag-doc {
   background: rgba(37, 99, 235, 0.1);
   color: #1e40af;
@@ -822,6 +830,87 @@ canvas.helper-lines {
   min-height: 80px;
   resize: vertical;
   line-height: 1.5;
+}
+
+/* Themed dropdown (replaces native <select> so the option list matches the UI) */
+.ui-select {
+  position: relative;
+  width: 100%;
+}
+.ui-select-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ui-select-btn:hover {
+  border-color: var(--accent);
+}
+.ui-select.open .ui-select-btn {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.ui-select-chev {
+  color: var(--text3);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.ui-select-chev.open {
+  transform: rotate(180deg);
+}
+.ui-select-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 3000;
+  background: #fff;
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  box-shadow: var(--sh-pop);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.ui-select-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  border-radius: 7px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+}
+.ui-select-opt:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.ui-select-opt.active {
+  background: var(--accent);
+  color: #fff;
 }
 .sp-input:focus,
 .sp-textarea:focus,

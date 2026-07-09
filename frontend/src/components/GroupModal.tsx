@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Trash2, Plus } from "lucide-react";
 import { useOrg } from "../store/orgStore";
 import { useUi } from "../store/uiStore";
@@ -13,8 +13,22 @@ export function GroupModal() {
   const deleteGroup = useOrg((s) => s.deleteGroup);
   const showConfirm = useUi((s) => s.showConfirm);
 
+  // Colors already taken by existing filters — hide them from the pickers.
+  const usedColors = useMemo(
+    () => new Set(groups.map((g) => g.color.toLowerCase())),
+    [groups]
+  );
+  const firstAvailable =
+    COLOR_PALETTE.find((c) => !usedColors.has(c.hex.toLowerCase()))?.hex ??
+    COLOR_PALETTE[0].hex;
+
   const [newName, setNewName] = useState("");
-  const [newColor, setNewColor] = useState(COLOR_PALETTE[0].hex);
+  const [newColor, setNewColor] = useState(firstAvailable);
+
+  // Keep the "add new" swatch on an available color as filters are added/removed.
+  useEffect(() => {
+    if (usedColors.has(newColor.toLowerCase())) setNewColor(firstAvailable);
+  }, [usedColors, newColor, firstAvailable]);
 
   if (!open) return null;
 
@@ -38,7 +52,7 @@ export function GroupModal() {
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
           {groups.map((g) => (
             <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <ColorDot color={g.color} onPick={(c) => updateGroup(g.id, { color: c })} />
+              <ColorDot color={g.color} used={usedColors} onPick={(c) => updateGroup(g.id, { color: c })} />
               <input
                 className="sp-input"
                 style={{ flex: 1 }}
@@ -73,7 +87,7 @@ export function GroupModal() {
         {/* add new */}
         <div className="sp-field-label">Add a new color</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-          <ColorDot color={newColor} onPick={setNewColor} />
+          <ColorDot color={newColor} used={usedColors} onPick={setNewColor} />
           <input
             className="sp-input"
             style={{ flex: 1 }}
@@ -95,9 +109,25 @@ export function GroupModal() {
   );
 }
 
-// A swatch that expands to the palette on click.
-function ColorDot({ color, onPick }: { color: string; onPick: (c: string) => void }) {
+// A swatch that expands to the palette on click. `used` hides colors already
+// taken by other filters (the picker's own current color stays selectable).
+function ColorDot({
+  color,
+  used,
+  onPick,
+}: {
+  color: string;
+  used?: Set<string>;
+  onPick: (c: string) => void;
+}) {
   const [open, setOpen] = useState(false);
+  let palette = COLOR_PALETTE;
+  if (used) {
+    const filtered = COLOR_PALETTE.filter(
+      (c) => c.hex.toLowerCase() === color.toLowerCase() || !used.has(c.hex.toLowerCase())
+    );
+    palette = filtered.length ? filtered : COLOR_PALETTE;
+  }
   return (
     <div style={{ position: "relative" }}>
       <button
@@ -110,7 +140,7 @@ function ColorDot({ color, onPick }: { color: string; onPick: (c: string) => voi
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 2199 }} onClick={() => setOpen(false)} />
           <div className="color-popover" style={{ position: "absolute", top: 36, left: 0, zIndex: 2200 }}>
-            {COLOR_PALETTE.map((c) => (
+            {palette.map((c) => (
               <button
                 key={c.hex}
                 className="cs-btn"

@@ -80,6 +80,16 @@ function buildVectorChart(rf: ReactFlowInstance, view: string): jsPDF {
 
   // ── Connections (drawn first, under the cards) ──
   const ids = new Set(geo.keys());
+  // Shared "bus" per parent: the highest child's top, so all siblings branch off
+  // one common horizontal line (matches the on-screen org-chart connectors).
+  const topChildY = new Map<string, number>();
+  for (const c of store.connections) {
+    if (c.view !== view) continue;
+    const t = geo.get(c.to);
+    if (!t || !ids.has(c.from) || !ids.has(c.to)) continue;
+    const prev = topChildY.get(c.from);
+    if (prev === undefined || t.y < prev) topChildY.set(c.from, t.y);
+  }
   for (const c of store.connections) {
     if (c.view !== view) continue;
     const s = geo.get(c.from);
@@ -92,11 +102,12 @@ function buildVectorChart(rf: ReactFlowInstance, view: string): jsPDF {
     const [r, g, b] = hexToRgb(store.nodes[c.from]?.color || "#7c3aed");
     pdf.setDrawColor(r, g, b);
     pdf.setLineWidth(1.2);
-    const midY = sy + (ty - sy) / 2;
-    // orthogonal elbow: down · across · down
-    pdf.line(sx, sy, sx, midY);
-    pdf.line(sx, midY, tx, midY);
-    pdf.line(tx, midY, tx, ty - 4);
+    const childTop = topChildY.get(c.from) ?? t.y;
+    const busY = (sy + Y(childTop)) / 2; // shared across all of this parent's children
+    // orthogonal elbow through the shared bus: down · across · down
+    pdf.line(sx, sy, sx, busY);
+    pdf.line(sx, busY, tx, busY);
+    pdf.line(tx, busY, tx, ty - 4);
     // arrowhead into the target's top
     pdf.setFillColor(r, g, b);
     pdf.triangle(tx, ty, tx - 4, ty - 6, tx + 4, ty - 6, "F");
