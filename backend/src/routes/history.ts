@@ -21,6 +21,10 @@ router.get("/", async (req, res) => {
   if (nodeId) {
     params.push(nodeId);
     where.push(`"details"->>'nodeId' = $${params.length}`);
+    // Per-node activity focuses on text/field changes — exclude position-move
+    // entries (old rows may still be tagged to a node). The global History view
+    // (no nodeId filter) still shows moves.
+    where.push(`"action" NOT LIKE 'Moved %'`);
   }
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
