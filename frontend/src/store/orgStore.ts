@@ -148,6 +148,75 @@ function cloneSelection(
   return { nodes, connections };
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  active: "Active",
+  hiring: "Hiring",
+  future: "Future Hire",
+  notice: "On Notice",
+};
+
+function trunc(s: string, n = 60): string {
+  const t = s.replace(/\s+/g, " ").trim();
+  return t.length > n ? t.slice(0, n - 1) + "…" : t;
+}
+
+// Describe a single text-field change in a human-readable way for the activity log.
+function textChange(label: string, oldV: string, newV: string): string | null {
+  const o = (oldV ?? "").trim();
+  const n = (newV ?? "").trim();
+  if (o === n) return null;
+  if (!o) return `${label} set to “${trunc(n)}”`;
+  if (!n) return `${label} cleared (was “${trunc(o)}”)`;
+  return `${label}: “${trunc(o)}” → “${trunc(n)}”`;
+}
+
+// Produce one activity-log line per meaningful field that changed between two
+// versions of a node. Powers the per-node "Activity / History" panel.
+function diffNode(prev: OrgNode, next: OrgNode): string[] {
+  const out: string[] = [];
+  const push = (c: string | null) => c && out.push(c);
+
+  push(textChange("Title", prev.title, next.title));
+  push(textChange("Badge", prev.badge, next.badge));
+  push(textChange("Sub-text", prev.sub, next.sub));
+  if (prev.status !== next.status) {
+    out.push(
+      `Status: ${STATUS_LABELS[prev.status] ?? prev.status} → ${STATUS_LABELS[next.status] ?? next.status}`
+    );
+  }
+  if (prev.color !== next.color) out.push(`Color changed (${prev.color} → ${next.color})`);
+
+  const pc = prev.clarity ?? ({} as OrgNode["clarity"]);
+  const nc = next.clarity ?? ({} as OrgNode["clarity"]);
+  push(textChange("Reports To", pc.reports_to || "", nc.reports_to || ""));
+  push(textChange("Department", pc.dept || "", nc.dept || ""));
+  push(textChange("R&R", pc.responsibilities || "", nc.responsibilities || ""));
+  push(textChange("Document link", pc.doc_link || "", nc.doc_link || ""));
+  push(textChange("Document notes", pc.doc_notes || "", nc.doc_notes || ""));
+
+  const arrChange = (label: string, a: string[] = [], b: string[] = []) => {
+    if (JSON.stringify(a) === JSON.stringify(b)) return;
+    if (a.length !== b.length) out.push(`${label}: ${a.length} → ${b.length} item(s)`);
+    else out.push(`${label} edited`);
+  };
+  arrChange("KPIs", pc.kpis, nc.kpis);
+  arrChange("KRAs", pc.kras, nc.kras);
+
+  if (JSON.stringify(prev.hc) !== JSON.stringify(next.hc)) {
+    const a = prev.hc, b = next.hc;
+    const parts: string[] = [];
+    if ((a?.req ?? 0) !== (b?.req ?? 0)) parts.push(`Req ${a?.req ?? 0}→${b?.req ?? 0}`);
+    if ((a?.have ?? 0) !== (b?.have ?? 0)) parts.push(`Have ${a?.have ?? 0}→${b?.have ?? 0}`);
+    if ((a?.notice ?? 0) !== (b?.notice ?? 0)) parts.push(`Notice ${a?.notice ?? 0}→${b?.notice ?? 0}`);
+    out.push(`Headcount: ${parts.join(", ") || "updated"}`);
+  }
+  if (JSON.stringify(prev.size) !== JSON.stringify(next.size)) {
+    if (!next.size) out.push("Size reset to default");
+    else out.push(`Size: ${next.size.w}×${next.size.h}`);
+  }
+  return out;
+}
+
 let toastSeq = 0;
 
 export const useOrg = create<OrgStore>((set, get) => {
@@ -283,7 +352,15 @@ export const useOrg = create<OrgStore>((set, get) => {
       if (opts?.record !== false) pushUndo();
       const next = { ...prev, ...patch } as OrgNode;
       set((s) => ({ nodes: { ...s.nodes, [id]: next } }));
-      mark(opts?.silent ? undefined : `Updated "${next.title}"`, id);
+      if (opts?.silent) {
+        mark();
+        return;
+      }
+      // Log a per-field "what changed" line for each edited field so the node's
+      // activity panel shows the actual text changes, not a generic "Updated".
+      const changes = diffNode(prev, next);
+      if (changes.length) changes.forEach((c) => mark(c, id));
+      else mark();
     },
 
     deleteNode: (id) => {
@@ -380,11 +457,13 @@ export const useOrg = create<OrgStore>((set, get) => {
           if (nodes[u.id]) nodes[u.id] = { ...nodes[u.id], x: u.x, y: u.y };
         return { nodes };
       });
+      // Position moves are recorded globally (History view) but NOT tagged to
+      // the node, so the per-node activity panel stays focused on text/field
+      // changes rather than every drag.
       mark(
         updates.length === 1
           ? `Moved "${get().nodes[updates[0].id]?.title ?? updates[0].id}"`
-          : `Moved ${updates.length} nodes`,
-        updates.length === 1 ? updates[0].id : undefined
+          : `Moved ${updates.length} nodes`
       );
     },
 
