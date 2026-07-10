@@ -36,14 +36,28 @@ const allowList = (process.env.CLIENT_ORIGIN || "")
   .split(",")
   .map(norm)
   .filter(Boolean);
+
+// Decide whether a browser Origin is allowed to make credentialed requests.
+function originAllowed(origin?: string): boolean {
+  if (!origin) return true; // same-origin / non-browser clients
+  if (!allowList.length) return true; // no allowlist configured → open
+  const o = norm(origin);
+  if (allowList.includes(o)) return true;
+  // Always trust this project's Vercel deployments (prod domain + previews),
+  // so changing the Vercel domain never breaks the API.
+  try {
+    if (new URL(o).hostname.endsWith(".vercel.app")) return true;
+  } catch {
+    /* malformed origin → fall through */
+  }
+  return false;
+}
+
 app.use(
   cors({
     origin(origin, cb) {
-      if (!allowList.length || !origin || allowList.includes(norm(origin))) {
-        cb(null, true); // reflects the request's own origin (needed for cookies)
-      } else {
-        cb(null, false);
-      }
+      // reflects the request's own origin when allowed (needed for cookies)
+      cb(null, originAllowed(origin));
     },
     credentials: true,
   })
